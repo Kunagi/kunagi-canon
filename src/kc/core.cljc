@@ -3,37 +3,35 @@
   #?(:cljs (:require-macros [kc.core :refer [SRC THROW mk-error def-ui $]]))
   (:require
    [clojure.string :as str]
-   [kc.interface :as kc-interface]))
+   [kc.interface :as kc-interface]
+   #?(:clj [kc.impl.macro-helpers :as macro-helpers])
+   ))
+
+(defn tsm []
+  #?(:cljs (.getTime (js/Date.))
+     :clj (System/currentTimeMillis)))
 
 ;;; context
 
-(defonce CONTEXT (atom {}))
+(defonce CONTEXT (atom {:context/id (str (random-uuid))
+                        :rt/created-tsm (tsm)
+                        :rt/debug-mode? false}))
+
+(defn context? [thing]
+  (boolean (:context/id thing)))
+
+;;; runtime
+
+(defn dev-mode? []
+  false)
+
+(defn debug-mode? []
+  (:rt/debug-mode? @CONTEXT))
 
 ;;; introspection
 
-#?(:clj (defn -src-from-env [form env the-ns]
-          (let [m (meta form)
-                fn-scope (-> env :fn-scope first)
-                in-fn (when fn-scope
-                        (symbol (str (-> fn-scope :info :ns))
-                                (str (-> fn-scope :name))))
-                src nil
-                src (if-let [line (:line m)]
-                      (assoc src :src/line line)
-                      src)
-                src (if-let [column (:column m)]
-                      (assoc src :src/column column)
-                      src)
-                src (if-let [file (:file m)]
-                      (assoc src :src/file file)
-                      src)
-                src (if the-ns
-                      (assoc src :src/ns (symbol (str the-ns)))
-                      src)
-                src (if in-fn
-                      (assoc src :src/fn in-fn)
-                      src)]
-            src)))
+(defmacro ENV []
+  {})
 
 (defmacro SRC
   "Macro: current source code location.
@@ -42,7 +40,7 @@
     :src/file \"some/namespace.cljc\"
     :src/line 42}`"
   []
-  (let [src (-src-from-env &form &env *ns*)]
+  (let [src (macro-helpers/src-from-env &form &env *ns*)]
     `'~src))
 
 (comment
@@ -51,51 +49,23 @@
 
 ;;; errors
 
-(:clj
- (defn -parse-error-form [message data]
-   (when data
-     (clojure.core/assert (map? data) "Error `data` must be a map"))
-   (clojure.core/assert
-    (or (qualified-keyword? message)
-        (string? message))
-    "Error `message` must be a string or qualified keyword")
-   (let [message-is-id? (qualified-keyword? message)
-         [error-id message] (if message-is-id?
-                              [message (str message)]
-                              [nil message])
-
-         ;; extract cause
-         cause (or (:err/cause data)
-                   (:cause data))
-         data (dissoc data :err/cause)
-         data (dissoc data :cause)
-
-         ;; data (assoc data
-         ;;             :err/source (-src-from-env &form &env *ns*))
-
-         data (if error-id
-                (assoc data :err/id error-id)
-                data)
-         ]
-     [message data cause])))
-
 (defmacro mk-error
   [message & [data]]
-  (let [[message data cause] (-parse-error-form message data)]
+  (let [[message data cause] (macro-helpers/parse-error-form message data)]
     `(ex-info ~message
               ;; TODO optimize by removing merge
               (merge ~data
-                     {:err/source '~(-src-from-env &form &env *ns*)})
+                     {:err/source '~(macro-helpers/src-from-env &form &env *ns*)})
               ~cause)))
 
 (defmacro THROW
   [message & [data]]
-  (let [[message data cause] (-parse-error-form message data)]
+  (let [[message data cause] (macro-helpers/parse-error-form message data)]
     `(throw
       (ex-info ~message
                ;; TODO optimize by removing merge
                (merge ~data
-                      {:err/source '~(-src-from-env &form &env *ns*)})
+                      {:err/source '~(macro-helpers/src-from-env &form &env *ns*)})
                ~cause))))
 
 (defn error-data? [thing]
@@ -186,14 +156,6 @@
        :err/data {:thing-which-failed-to-interpret thing}
        :err/cause ex})))
 
-;;; incubator
-
-(defn hello []
-  "hello")
-
-(comment
-  (hello))
-
 ;;; user interface (HTML)
 
 (defmacro def-ui
@@ -204,3 +166,12 @@
 (defmacro $
   [tag-name & attrs-and-children]
   `(kc-interface/$ ~tag-name ~@attrs-and-children))
+
+
+;;; incubator
+
+(defn hello []
+  "hello")
+
+(comment
+  (hello))
