@@ -1,8 +1,9 @@
 ;; ##canonical##
 (ns kc.core
-  #?(:cljs (:require-macros [kc.core :refer [SRC THROW mk-error]]))
+  #?(:cljs (:require-macros [kc.core :refer [SRC THROW mk-error def-ui $]]))
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [kc.interface :as kc-interface]))
 
 ;;; context
 
@@ -86,7 +87,6 @@
               (merge ~data
                      {:err/source '~(-src-from-env &form &env *ns*)})
               ~cause)))
-
 
 (defmacro THROW
   [message & [data]]
@@ -193,3 +193,14 @@
 
 (comment
   (hello))
+
+;;; user interface (HTML)
+
+(defmacro def-ui
+  {:clj-kondo/lint-as 'clojure.core/defn}
+  [type & form-body]
+  `(kc-interface/def-ui ~type ~@form-body))
+
+(defmacro $
+  [tag-name & attrs-and-children]
+  `(kc-interface/$ ~tag-name ~@attrs-and-children))
