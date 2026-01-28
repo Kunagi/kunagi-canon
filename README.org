@@ -1,2 +1,10 @@
 #+title:      Kunagi Canon
 #+date:       [2026-01-28 Mi 11:49]
+
+* User Interface
+
+   #+begin_src clojure
+     ($ :div
+        ($ AComponent
+           {:param-1 "some value"}))
+   #+end_src
