@@ -4,6 +4,10 @@
   (:require
    [clojure.string :as str]))
 
+;;; context
+
+(defonce CONTEXT (atom {}))
+
 ;;; introspection
 
 #?(:clj (defn -src-from-env [form env the-ns]
@@ -72,7 +76,7 @@
                 (assoc data :err/id error-id)
                 data)
          ]
-     [message data])))
+     [message data cause])))
 
 (defmacro mk-error
   [message & [data]]
