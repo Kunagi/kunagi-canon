@@ -1,9 +1,9 @@
 ;; ##canonical##
 (ns kc.core
-  #?(:cljs (:require-macros [kc.core :refer [SRC THROW mk-error def-ui $]]))
+  #?(:cljs (:require-macros [kc.core :refer [SRC THROW mk-error def-ui $ -mk-env]]))
   (:require
    [clojure.string :as str]
-   [kc.interface :as kc-interface]
+   [kc.interface :as interface]
    #?(:clj [kc.impl.macro-helpers :as macro-helpers])
    ))
 
@@ -13,25 +13,47 @@
 
 ;;; context
 
-(defonce CONTEXT (atom {:context/id (str (random-uuid))
-                        :rt/created-tsm (tsm)
-                        :rt/debug-mode? false}))
+(defmacro -mk-env []
+  (let [env {
+             ;; :keys (keys &env)
+             ;; :DEBUG (->> &env :fn-scope (take 10))
+
+             :build/mode (-> &env :shadow.build/mode)
+             ;; :fn-scope (-> &env :fn-scope)
+             ;; :shadow.build/root-form (-> &env :shadow.build/root-form)
+
+             :build/tsm (System/currentTimeMillis)
+             }]
+
+    `'~env
+    ))
+
+(def -env (-mk-env))
+
+(def rt-live? #?(:cljs (boolean (not goog.DEBUG))
+                      :clj false))
 
 (defn context? [thing]
   (boolean (:context/id thing)))
 
-;;; runtime
+(defn- -mk-context []
+  (let [context (merge -env
+                       {:context/id (str (random-uuid))
+                        :rt/created-tsm (tsm)
+                        :rt/live? rt-live?})
+        context (interface/init-context context)
+        _ (clojure.core/assert (context? context))
+        ]
+    context))
 
-(defn dev-mode? []
-  false)
+(defonce CONTEXT (atom (-mk-context)))
+
+
 
 (defn debug-mode? []
   (:rt/debug-mode? @CONTEXT))
 
 ;;; introspection
-
-(defmacro ENV []
-  {})
 
 (defmacro SRC
   "Macro: current source code location.
@@ -161,11 +183,11 @@
 (defmacro def-ui
   {:clj-kondo/lint-as 'clojure.core/defn}
   [type & form-body]
-  `(kc-interface/def-ui ~type ~@form-body))
+  `(interface/def-ui ~type ~@form-body))
 
 (defmacro $
   [tag-name & attrs-and-children]
-  `(kc-interface/$ ~tag-name ~@attrs-and-children))
+  `(interface/$ ~tag-name ~@attrs-and-children))
 
 
 ;;; incubator

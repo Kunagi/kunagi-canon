@@ -2,6 +2,9 @@
   #?(:cljs (:require-macros [kc.interface :refer [def-ui $]]))
   )
 
+(defn init-context [context]
+  context)
+
 (defmacro def-ui
   {:clj-kondo/lint-as 'clojure.core/defn}
   [type & form-body]
